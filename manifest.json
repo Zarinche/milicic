@@ -1,8 +1,7 @@
 {
   "directories": [
     {
-      "name": "Primer Programa",
-      "path": "programas/programa-uno",
+      "name": "V1"
       "size": 1548576,
       "fileCount": 2,
       "version": "1.0.0",
@@ -20,8 +19,7 @@
       ]
     },
     {
-      "name": "Segundo Programa",
-      "path": "programas/programa-dos",
+      "name": "V2",
       "size": 4194304,
       "fileCount": 1,
       "version": "2.0.0",
