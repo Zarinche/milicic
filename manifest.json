@@ -1,21 +1,35 @@
 {
   "directories": [
     {
-      "name": "Nombre del Programa",
-      "path": "carpeta/del/programa",
+      "name": "Primer Programa",
+      "path": "programas/programa-uno",
       "size": 1548576,
       "fileCount": 2,
       "version": "1.0.0",
       "files": [
         {
-          "path": "carpeta/del/programa/archivo1.exe",
+          "path": "programas/programa-uno/archivo1.exe",
           "relativePath": "archivo1.exe",
-          "url": "https://tusitio.com/carpeta/del/programa/archivo1.exe"
+          "url": "https://tusitio.com/programas/programa-uno/archivo1.exe"
         },
         {
-          "path": "carpeta/del/programa/config.json",
+          "path": "programas/programa-uno/config.json",
           "relativePath": "config.json",
-          "url": "https://tusitio.com/carpeta/del/programa/config.json"
+          "url": "https://tusitio.com/programas/programa-uno/config.json"
+        }
+      ]
+    },
+    {
+      "name": "Segundo Programa",
+      "path": "programas/programa-dos",
+      "size": 4194304,
+      "fileCount": 1,
+      "version": "2.0.0",
+      "files": [
+        {
+          "path": "programas/programa-dos/app.exe",
+          "relativePath": "app.exe",
+          "url": "https://tusitio.com/programas/programa-dos/app.exe"
         }
       ]
     }
