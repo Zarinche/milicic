@@ -1,0 +1,23 @@
+{
+  "directories": [
+    {
+      "name": "Nombre del Programa",
+      "path": "carpeta/del/programa",
+      "size": 1548576,
+      "fileCount": 2,
+      "version": "1.0.0",
+      "files": [
+        {
+          "path": "carpeta/del/programa/archivo1.exe",
+          "relativePath": "archivo1.exe",
+          "url": "https://tusitio.com/carpeta/del/programa/archivo1.exe"
+        },
+        {
+          "path": "carpeta/del/programa/config.json",
+          "relativePath": "config.json",
+          "url": "https://tusitio.com/carpeta/del/programa/config.json"
+        }
+      ]
+    }
+  ]
+}
