@@ -13,10 +13,8 @@
       --card: #181825;
       --card-hover: #202035;
       --border: #2a2a40;
-
       --text: #f8f8f2;
       --muted: #a6a6b8;
-
       --purple: #bd93f9;
       --purple-dark: #9b6de0;
       --pink: #ff79c6;
@@ -24,7 +22,6 @@
       --green: #50fa7b;
       --red: #ff5555;
       --yellow: #f1fa8c;
-
       --radius: 22px;
     }
 
@@ -56,11 +53,7 @@
           rgba(255, 121, 198, 0.09),
           transparent 30%
         ),
-        linear-gradient(
-          135deg,
-          var(--bg),
-          var(--bg2)
-        );
+        linear-gradient(135deg, var(--bg), var(--bg2));
 
       padding: 40px 20px;
     }
@@ -94,8 +87,7 @@
       font-size: 32px;
 
       box-shadow:
-        0 15px 45px
-        rgba(189, 147, 249, 0.25);
+        0 15px 45px rgba(189, 147, 249, 0.25);
     }
 
     h1 {
@@ -158,8 +150,7 @@
       border-radius: var(--radius);
 
       box-shadow:
-        0 15px 40px
-        rgba(0, 0, 0, 0.35);
+        0 15px 40px rgba(0, 0, 0, 0.35);
 
       backdrop-filter: blur(14px);
 
@@ -176,8 +167,7 @@
       border-color: rgba(189, 147, 249, 0.45);
 
       box-shadow:
-        0 25px 55px
-        rgba(0, 0, 0, 0.48);
+        0 25px 55px rgba(0, 0, 0, 0.48);
     }
 
     .folder {
@@ -276,18 +266,12 @@
       transform: scale(1.02);
 
       box-shadow:
-        0 10px 30px
-        rgba(189, 147, 249, 0.28);
-    }
-
-    .download:active:not(:disabled) {
-      transform: scale(0.98);
+        0 10px 30px rgba(189, 147, 249, 0.28);
     }
 
     .download:disabled {
       cursor: wait;
       opacity: 0.55;
-      transform: none;
     }
 
     .loading,
@@ -365,964 +349,577 @@
 
 <body>
 
-  <main class="container">
+<main class="container">
 
-    <header>
+  <header>
 
-      <div class="logo">📁</div>
+    <div class="logo">📁</div>
 
-      <h1>Automatizador de programas</h1>
+    <h1>Automatizador de programas</h1>
 
-      <p class="subtitle">
-        Explora y descarga las versiones que más te agraden.
-        SOLO DISPONIBLE PARA PC
-      </p>
+    <p class="subtitle">
+      Explora y descarga las versiones que más te agraden.<br>
+      SOLO DISPONIBLE PARA PC
+    </p>
 
-      <div class="status" id="statusContainer">
-        <span class="status-dot"></span>
+    <div class="status" id="statusContainer">
+      <span class="status-dot"></span>
+      <span id="status">
+        Cargando repositorio...
+      </span>
+    </div>
 
-        <span id="status">
-          Analizando repositorio...
-        </span>
+  </header>
+
+  <section
+    id="directories"
+    class="directories"
+  >
+
+    <div class="loading">
+
+      <div class="spinner"></div>
+
+      <div class="loading-title">
+        Detectando directorios...
       </div>
 
-    </header>
-
-    <section
-      id="directories"
-      class="directories"
-    >
-
-      <div class="loading">
-
-        <div class="spinner"></div>
-
-        <div class="loading-title">
-          Detectando directorios...
-        </div>
-
-        <div>
-          Conectando con GitHub
-        </div>
-
+      <div>
+        Cargando catálogo
       </div>
 
-    </section>
+    </div>
 
-    <footer>
-      GitHub Directory Explorer · Dracula Dark UI
-    </footer>
+  </section>
 
-  </main>
+  <footer>
+    Automatizador · Dracula Dark UI
+  </footer>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+</main>
 
-  <script>
-    /*
-    ============================================================
-      CONFIGURACIÓN
-    ============================================================
-    */
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
-    const API = "https://api.github.com";
+<script>
 
-    const container =
-      document.getElementById("directories");
+const container =
+  document.getElementById("directories");
 
-    const statusText =
-      document.getElementById("status");
+const statusText =
+  document.getElementById("status");
 
-    const statusContainer =
-      document.getElementById("statusContainer");
+const statusContainer =
+  document.getElementById("statusContainer");
 
-    /*
-      Cacheamos el árbol del repositorio.
-      Así NO hacemos una petición GitHub por cada carpeta.
-    */
-    let repositoryTree = [];
 
-    let repositoryInfo = null;
+/*
+============================================================
+  CARGAR MANIFEST
+============================================================
+*/
 
+async function loadManifest() {
 
-    /*
-    ============================================================
-      DETECTAR REPOSITORIO
-    ============================================================
-    */
+  /*
+    cache busting para que GitHub Pages
+    no muestre un manifest viejo
+  */
 
-    function getRepository() {
+  const url =
+    `manifest.json?v=${Date.now()}`;
 
-      const host =
-        location.hostname;
 
-      const path =
-        location.pathname
-          .replace(/^\/+|\/+$/g, "")
-          .split("/")
-          .filter(Boolean);
+  const response =
+    await fetch(url, {
+      cache: "no-store"
+    });
 
 
-      /*
-        GitHub Pages
+  if (!response.ok) {
 
-        usuario.github.io/repositorio
-      */
+    throw new Error(
+      `No se pudo cargar manifest.json (${response.status})`
+    );
 
-      if (host.endsWith(".github.io")) {
+  }
 
-        const owner =
-          host.split(".")[0];
 
-        if (path.length >= 1) {
+  return response.json();
+}
 
-          return {
-            owner,
-            repo: path[0]
-          };
 
-        }
+/*
+============================================================
+  FORMATEAR BYTES
+============================================================
+*/
 
-        /*
-          Si es usuario.github.io sin
-          subdirectorio, normalmente el
-          repositorio es usuario.github.io.
-        */
+function formatBytes(bytes) {
 
-        return {
-          owner,
-          repo: `${owner}.github.io`
-        };
+  if (!Number.isFinite(bytes) || bytes <= 0) {
+    return "0 B";
+  }
 
-      }
+  const units = [
+    "B",
+    "KB",
+    "MB",
+    "GB",
+    "TB"
+  ];
 
+  const index =
+    Math.min(
+      Math.floor(
+        Math.log(bytes) / Math.log(1024)
+      ),
+      units.length - 1
+    );
 
-      /*
-        github.com/usuario/repositorio
-      */
+  return (
+    (bytes / Math.pow(1024, index))
+      .toFixed(index === 0 ? 0 : 1)
+    + " "
+    + units[index]
+  );
+}
 
-      if (
-        host === "github.com" &&
-        path.length >= 2
-      ) {
 
-        return {
-          owner: path[0],
-          repo: path[1]
-        };
+/*
+============================================================
+  ESCAPAR HTML
+============================================================
+*/
 
-      }
+function escapeHTML(value) {
 
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 
-      /*
-        CONFIGURACIÓN MANUAL
+}
 
-        Si utilizas otro hosting:
-      */
 
-      return {
-        owner: "TU_USUARIO",
-        repo: "TU_REPOSITORIO"
-      };
-    }
+/*
+============================================================
+  DESCARGAR CARPETA
+============================================================
+*/
 
+async function downloadFolder(
+  event,
+  directory
+) {
 
-    /*
-    ============================================================
-      FORMATEAR FECHA
-    ============================================================
-    */
+  const button =
+    event.currentTarget;
 
-    function formatDate(date) {
+  const originalText =
+    button.textContent;
 
-      return new Intl.DateTimeFormat(
-        "es-ES",
-        {
-          dateStyle: "medium",
-          timeStyle: "short"
-        }
-      ).format(new Date(date));
+  button.disabled = true;
 
-    }
 
+  try {
 
-    /*
-    ============================================================
-      FORMATEAR BYTES
-    ============================================================
-    */
-
-    function formatBytes(bytes) {
-
-      if (!Number.isFinite(bytes) || bytes <= 0) {
-        return "0 B";
-      }
-
-      const units = [
-        "B",
-        "KB",
-        "MB",
-        "GB",
-        "TB"
-      ];
-
-      const index =
-        Math.min(
-          Math.floor(
-            Math.log(bytes) / Math.log(1024)
-          ),
-          units.length - 1
-        );
-
-      return (
-        (bytes / Math.pow(1024, index))
-          .toFixed(index === 0 ? 0 : 1)
-        + " "
-        + units[index]
-      );
-    }
-
-
-    /*
-    ============================================================
-      REQUEST GITHUB
-    ============================================================
-    */
-
-    async function github(url) {
-
-      const response =
-        await fetch(
-          url,
-          {
-            headers: {
-              "Accept":
-                "application/vnd.github+json"
-            }
-          }
-        );
-
-
-      if (!response.ok) {
-
-        let message =
-          `GitHub API respondió ${response.status}`;
-
-        try {
-
-          const error =
-            await response.json();
-
-          if (error.message) {
-            message += `: ${error.message}`;
-          }
-
-        } catch {
-          // Ignorar error de JSON.
-        }
-
-        throw new Error(message);
-      }
-
-
-      return response.json();
-    }
-
-
-    /*
-    ============================================================
-      CARGAR REPOSITORIO
-    ============================================================
-    */
-
-    async function loadRepository() {
-
-      const {
-        owner,
-        repo
-      } = getRepository();
-
-
-      if (
-        owner === "TU_USUARIO" ||
-        repo === "TU_REPOSITORIO"
-      ) {
-
-        throw new Error(
-          "No se pudo detectar el repositorio. Configura owner y repo en el código."
-        );
-      }
-
-
-      /*
-        Información del repositorio.
-      */
-
-      const repoInfo =
-        await github(
-          `${API}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`
-        );
-
-
-      const branch =
-        repoInfo.default_branch;
-
-
-      /*
-        IMPORTANTE:
-
-        Usamos Git Trees API una sola vez.
-      */
-
-      const tree =
-        await github(
-          `${API}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/trees/${encodeURIComponent(branch)}?recursive=1`
-        );
-
-
-      if (tree.truncated) {
-
-        console.warn(
-          "GitHub ha truncado el árbol del repositorio."
-        );
-
-      }
-
-
-      repositoryTree =
-        tree.tree.filter(
-          item =>
-            item.type === "blob"
-        );
-
-
-      repositoryInfo = {
-        owner,
-        repo,
-        branch
-      };
-
-
-      return repositoryInfo;
-    }
-
-
-    /*
-    ============================================================
-      OBTENER DIRECTORIOS
-    ============================================================
-    */
-
-    function getDirectories() {
-
-      /*
-        Obtenemos las carpetas de primer nivel
-        a partir del árbol.
-      */
-
-      const directories =
-        new Map();
-
-
-      for (const file of repositoryTree) {
-
-        const parts =
-          file.path.split("/");
-
-        if (parts.length < 2) {
-          continue;
-        }
-
-        const directory =
-          parts[0];
-
-
-        if (!directories.has(directory)) {
-
-          directories.set(
-            directory,
-            {
-              name: directory,
-              path: directory
-            }
-          );
-
-        }
-      }
-
-
-      return [...directories.values()];
-    }
-
-
-    /*
-    ============================================================
-      INFORMACIÓN DE CARPETA
-    ============================================================
-    */
-
-    function getDirectoryData(directory) {
-
-      const prefix =
-        directory.path + "/";
-
-
-      const files =
-        repositoryTree.filter(
-          file =>
-            file.path.startsWith(prefix)
-        );
-
-
-      const size =
-        files.reduce(
-          (total, file) =>
-            total + (file.size || 0),
-          0
-        );
-
-
-      /*
-        El tree API puede proporcionar
-        el tamaño de los blobs.
-      */
-
-      return {
-        files,
-        size,
-        fileCount: files.length
-      };
-    }
-
-
-    /*
-    ============================================================
-      CREAR TARJETA
-    ============================================================
-    */
-
-    function createCard(
-      directory,
-      data,
-      owner,
-      repo,
-      branch
+    if (
+      !directory.files ||
+      !directory.files.length
     ) {
 
-      const card =
-        document.createElement("article");
-
-      card.className =
-        "directory";
-
-
-      const updated =
-        "Disponible desde el repositorio";
-
-
-      card.innerHTML = `
-
-        <div class="folder">
-
-          <div class="folder-icon">
-            📁
-          </div>
-
-          <div class="folder-info">
-
-            <div class="folder-name">
-              ${escapeHTML(directory.name)}
-            </div>
-
-            <div class="folder-path">
-              /${escapeHTML(directory.path)}
-            </div>
-
-          </div>
-
-        </div>
-
-
-        <div class="info">
-
-          <div class="info-box">
-
-            <div class="label">
-              Estado
-            </div>
-
-            <div class="value">
-              ${updated}
-            </div>
-
-          </div>
-
-
-          <div class="info-box">
-
-            <div class="label">
-              Peso
-            </div>
-
-            <div class="value">
-              ${formatBytes(data.size)}
-            </div>
-
-          </div>
-
-
-          <div class="info-box">
-
-            <div class="label">
-              Archivos
-            </div>
-
-            <div class="value">
-              ${data.fileCount}
-            </div>
-
-          </div>
-
-
-          <div class="info-box">
-
-            <div class="label">
-              Rama
-            </div>
-
-            <div class="value">
-              ${escapeHTML(branch)}
-            </div>
-
-          </div>
-
-        </div>
-
-
-        <button
-          class="download"
-          type="button"
-        >
-          ↓ Descargar carpeta
-        </button>
-
-      `;
-
-
-      const button =
-        card.querySelector(".download");
-
-
-      button.addEventListener(
-        "click",
-        event => {
-
-          downloadFolder(
-            event,
-            owner,
-            repo,
-            directory.path,
-            branch,
-            data.files
-          );
-
-        }
+      throw new Error(
+        "La carpeta está vacía."
       );
 
-
-      return card;
     }
 
 
-    /*
-    ============================================================
-      DESCARGAR CARPETA
-    ============================================================
-    */
+    const zip =
+      new JSZip();
 
-    async function downloadFolder(
-      event,
-      owner,
-      repo,
-      path,
-      branch,
-      files
+
+    const files =
+      directory.files;
+
+
+    const concurrency = 6;
+
+
+    for (
+      let i = 0;
+      i < files.length;
+      i += concurrency
     ) {
 
-      const button =
-        event.currentTarget;
+      const batch =
+        files.slice(
+          i,
+          i + concurrency
+        );
 
 
-      const originalText =
-        button.textContent;
+      button.textContent =
+        `Descargando ${Math.min(
+          i + batch.length,
+          files.length
+        )}/${files.length}...`;
 
 
-      button.disabled = true;
+      await Promise.all(
+        batch.map(
+          async file => {
+
+            const response =
+              await fetch(
+                file.url
+              );
 
 
-      try {
+            if (!response.ok) {
 
-        if (!files.length) {
+              throw new Error(
+                `No se pudo descargar: ${file.path}`
+              );
 
-          throw new Error(
-            "La carpeta está vacía."
-          );
-
-        }
+            }
 
 
-        const zip =
-          new JSZip();
+            const blob =
+              await response.blob();
 
 
-        /*
-          Descargas paralelas por grupos.
-
-          Esto es considerablemente más rápido
-          que descargar archivo por archivo.
-        */
-
-        const concurrency = 6;
-
-
-        for (
-          let i = 0;
-          i < files.length;
-          i += concurrency
-        ) {
-
-          const batch =
-            files.slice(
-              i,
-              i + concurrency
+            zip.file(
+              file.relativePath,
+              blob
             );
 
-
-          button.textContent =
-            `Descargando ${Math.min(
-              i + batch.length,
-              files.length
-            )}/${files.length}...`;
-
-
-          await Promise.all(
-            batch.map(
-              async file => {
-
-                /*
-                  Usamos download_url de GitHub
-                  cuando está disponible.
-                */
-
-                const url =
-                  file.url ||
-                  `https://raw.githubusercontent.com/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${encodeURIComponent(branch)}/${file.path
-                    .split("/")
-                    .map(encodeURIComponent)
-                    .join("/")}`;
-
-
-                const response =
-                  await fetch(url);
-
-
-                if (!response.ok) {
-
-                  throw new Error(
-                    `No se pudo descargar: ${file.path}`
-                  );
-
-                }
-
-
-                const blob =
-                  await response.blob();
-
-
-                const prefix =
-                  path + "/";
-
-
-                const relativePath =
-                  file.path.startsWith(prefix)
-                    ? file.path.substring(
-                        prefix.length
-                      )
-                    : file.path;
-
-
-                zip.file(
-                  relativePath,
-                  blob
-                );
-
-              }
-            )
-          );
-        }
-
-
-        /*
-          Generar ZIP.
-        */
-
-        button.textContent =
-          "Comprimiendo...";
-
-
-        const zipBlob =
-          await zip.generateAsync(
-            {
-              type: "blob",
-              compression: "DEFLATE",
-              compressionOptions: {
-                level: 6
-              }
-            },
-            metadata => {
-
-              button.textContent =
-                `Comprimiendo ${Math.round(
-                  metadata.percent
-                )}%...`;
-
-            }
-          );
-
-
-        /*
-          Descargar.
-        */
-
-        const url =
-          URL.createObjectURL(zipBlob);
-
-
-        const link =
-          document.createElement("a");
-
-
-        link.href = url;
-
-
-        const folderName =
-          path
-            .split("/")
-            .filter(Boolean)
-            .pop() || "carpeta";
-
-
-        link.download =
-          `${folderName}.zip`;
-
-
-        document.body.appendChild(link);
-
-        link.click();
-
-        link.remove();
-
-
-        /*
-          Esperar un momento antes de liberar
-          el objeto para evitar problemas en
-          algunos navegadores.
-        */
-
-        setTimeout(
-          () => URL.revokeObjectURL(url),
-          1000
-        );
-
-
-      } catch (error) {
-
-        console.error(error);
-
-
-        alert(
-          "No se pudo descargar la carpeta:\n\n" +
-          error.message
-        );
-
-
-      } finally {
-
-        button.disabled = false;
-
-        button.textContent =
-          originalText;
-
-      }
-    }
-
-
-    /*
-    ============================================================
-      ESCAPAR HTML
-    ============================================================
-    */
-
-    function escapeHTML(value) {
-
-      return String(value)
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#039;");
-    }
-
-
-    /*
-    ============================================================
-      MOSTRAR ERROR
-    ============================================================
-    */
-
-    function showError(error) {
-
-      statusText.textContent =
-        "Error";
-
-      statusContainer.classList.add(
-        "error"
+          }
+        )
       );
 
+    }
+
+
+    button.textContent =
+      "Comprimiendo...";
+
+
+    const zipBlob =
+      await zip.generateAsync(
+        {
+          type: "blob",
+          compression: "DEFLATE",
+          compressionOptions: {
+            level: 6
+          }
+        },
+        metadata => {
+
+          button.textContent =
+            `Comprimiendo ${Math.round(
+              metadata.percent
+            )}%...`;
+
+        }
+      );
+
+
+    const url =
+      URL.createObjectURL(zipBlob);
+
+
+    const link =
+      document.createElement("a");
+
+
+    link.href = url;
+
+    link.download =
+      `${directory.name}.zip`;
+
+
+    document.body.appendChild(link);
+
+    link.click();
+
+    link.remove();
+
+
+    setTimeout(
+      () => URL.revokeObjectURL(url),
+      2000
+    );
+
+
+  } catch (error) {
+
+    console.error(error);
+
+    alert(
+      "No se pudo descargar la carpeta:\n\n" +
+      error.message
+    );
+
+  } finally {
+
+    button.disabled = false;
+
+    button.textContent =
+      originalText;
+
+  }
+
+}
+
+
+/*
+============================================================
+  CREAR TARJETA
+============================================================
+*/
+
+function createCard(directory) {
+
+  const card =
+    document.createElement("article");
+
+  card.className =
+    "directory";
+
+
+  card.innerHTML = `
+
+    <div class="folder">
+
+      <div class="folder-icon">
+        📁
+      </div>
+
+      <div class="folder-info">
+
+        <div class="folder-name">
+          ${escapeHTML(directory.name)}
+        </div>
+
+        <div class="folder-path">
+          /${escapeHTML(directory.path)}
+        </div>
+
+      </div>
+
+    </div>
+
+
+    <div class="info">
+
+      <div class="info-box">
+
+        <div class="label">
+          Estado
+        </div>
+
+        <div class="value">
+          Disponible
+        </div>
+
+      </div>
+
+
+      <div class="info-box">
+
+        <div class="label">
+          Peso
+        </div>
+
+        <div class="value">
+          ${formatBytes(directory.size)}
+        </div>
+
+      </div>
+
+
+      <div class="info-box">
+
+        <div class="label">
+          Archivos
+        </div>
+
+        <div class="value">
+          ${directory.fileCount}
+        </div>
+
+      </div>
+
+
+      <div class="info-box">
+
+        <div class="label">
+          Versión
+        </div>
+
+        <div class="value">
+          ${escapeHTML(
+            directory.version || "Disponible"
+          )}
+        </div>
+
+      </div>
+
+    </div>
+
+
+    <button
+      class="download"
+      type="button"
+    >
+      ↓ Descargar carpeta
+    </button>
+
+  `;
+
+
+  const button =
+    card.querySelector(".download");
+
+
+  button.addEventListener(
+    "click",
+    event => {
+
+      downloadFolder(
+        event,
+        directory
+      );
+
+    }
+  );
+
+
+  return card;
+}
+
+
+/*
+============================================================
+  MOSTRAR ERROR
+============================================================
+*/
+
+function showError(error) {
+
+  statusText.textContent =
+    "Error";
+
+  statusContainer.classList.add(
+    "error"
+  );
+
+
+  container.innerHTML = `
+
+    <div class="error">
+
+      <h2>
+        No se pudo cargar el catálogo
+      </h2>
+
+      <p>
+        ${escapeHTML(error.message)}
+      </p>
+
+      <p style="margin-top:15px">
+        Comprueba que manifest.json exista
+        en la raíz del sitio.
+      </p>
+
+    </div>
+
+  `;
+
+}
+
+
+/*
+============================================================
+  INICIALIZAR
+============================================================
+*/
+
+async function init() {
+
+  try {
+
+    const manifest =
+      await loadManifest();
+
+
+    const directories =
+      manifest.directories || [];
+
+
+    if (!directories.length) {
 
       container.innerHTML = `
 
-        <div class="error">
+        <div class="empty">
 
           <h2>
-            No se pudo cargar el repositorio
+            No hay carpetas disponibles
           </h2>
 
-          <p>
-            ${escapeHTML(error.message)}
+          <p style="margin-top:10px">
+            El repositorio no contiene
+            directorios publicables.
           </p>
 
         </div>
 
       `;
+
+
+      statusText.textContent =
+        "0 directorios encontrados";
+
+      return;
+
     }
 
 
-    /*
-    ============================================================
-      INICIALIZAR
-    ============================================================
-    */
-
-    async function init() {
-
-      try {
-
-        /*
-          Cargar repositorio y árbol
-          una sola vez.
-        */
-
-        const {
-          owner,
-          repo,
-          branch
-        } =
-          await loadRepository();
+    statusText.textContent =
+      `${directories.length} directorios encontrados`;
 
 
-        const directories =
-          getDirectories();
+    container.innerHTML = "";
 
 
-        /*
-          No hay carpetas.
-        */
+    for (
+      const directory of directories
+    ) {
 
-        if (!directories.length) {
+      container.appendChild(
+        createCard(directory)
+      );
 
-          container.innerHTML = `
-
-            <div class="empty">
-
-              <h2>
-                No hay carpetas en la raíz
-              </h2>
-
-              <p style="margin-top:10px">
-                Este repositorio no contiene
-                directorios visibles.
-              </p>
-
-            </div>
-
-          `;
-
-
-          statusText.textContent =
-            "0 directorios encontrados";
-
-
-          return;
-        }
-
-
-        /*
-          Mostrar cantidad.
-        */
-
-        statusText.textContent =
-          `${directories.length} directorios encontrados`;
-
-
-        container.innerHTML = "";
-
-
-        /*
-          Crear tarjetas.
-        */
-
-        for (
-          const directory of directories
-        ) {
-
-          const data =
-            getDirectoryData(
-              directory
-            );
-
-
-          const card =
-            createCard(
-              directory,
-              data,
-              owner,
-              repo,
-              branch
-            );
-
-
-          container.appendChild(card);
-        }
-
-
-      } catch (error) {
-
-        console.error(error);
-
-        showError(error);
-      }
     }
 
 
-    /*
-    ============================================================
-      ARRANCAR
-    ============================================================
-    */
+  } catch (error) {
 
-    init();
+    console.error(error);
 
-  </script>
+    showError(error);
+
+  }
+
+}
+
+
+init();
+
+</script>
 
 </body>
 </html>
