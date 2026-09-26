@@ -295,9 +295,11 @@ const container = document.getElementById("directories");
 const statusText = document.getElementById("status");
 const statusContainer = document.getElementById("statusContainer");
 
-// Configuración fija del repositorio real
 const owner = "Zarinche";
 const repo = "milicic";
+const branch = "main";
+
+let repositoryData = null;
 
 function formatBytes(bytes) {
   if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
@@ -315,63 +317,38 @@ function escapeHTML(value) {
     .replaceAll("'", "&#039;");
 }
 
-// Escanear recursivamente el contenido de una carpeta en GitHub
-async function getFolderContents(currentPath = "") {
-  const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${currentPath}`;
-  const response = await fetch(apiUrl);
-  if (!response.ok) throw new Error(`No se pudo acceder a la ruta: ${currentPath}`);
-  
-  const items = await response.json();
-  let files = [];
-  let totalSize = 0;
-
-  for (const item of items) {
-    if (item.type === "file") {
-      files.push({
-        name: item.name,
-        path: item.path,
-        relativePath: item.path.split("/").slice(1).join("/"), 
-        downloadUrl: item.download_url,
-        size: item.size
-      });
-      totalSize += item.size;
-    } else if (item.type === "dir") {
-      const subFolder = await getFolderContents(item.path);
-      files = files.concat(subFolder.files);
-      totalSize += subFolder.size;
-    }
-  }
-
-  return { files, size: totalSize };
-}
-
-async function downloadFolder(event, directory) {
+async function downloadFolder(event, folderName) {
   const button = event.currentTarget;
   const originalText = button.textContent;
   button.disabled = true;
 
   try {
     button.textContent = "Obteniendo archivos...";
-    const folderData = await getFolderContents(directory.name);
+    
+    // Filtrar archivos que pertenecen a esta carpeta específica
+    const folderFiles = repositoryData.filter(item => item.path.startsWith(folderName + "/") && item.type === "blob");
 
-    if (!folderData.files.length) {
+    if (!folderFiles.length) {
       throw new Error("La carpeta está vacía.");
     }
 
     const zip = new JSZip();
-    const files = folderData.files;
     const concurrency = 5;
 
-    for (let i = 0; i < files.length; i += concurrency) {
-      const batch = files.slice(i, i + concurrency);
-      button.textContent = `Descargando ${Math.min(i + batch.length, files.length)}/${files.length}...`;
+    for (let i = 0; i < folderFiles.length; i += concurrency) {
+      const batch = folderFiles.slice(i, i + concurrency);
+      button.textContent = `Descargando ${Math.min(i + batch.length, folderFiles.length)}/${folderFiles.length}...`;
 
       await Promise.all(
         batch.map(async file => {
-          const res = await fetch(file.downloadUrl);
-          if (!res.ok) throw new Error(`Error al descargar ${file.name}`);
+          const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${file.path}`;
+          const res = await fetch(rawUrl);
+          if (!res.ok) throw new Error(`Error al descargar ${file.path}`);
           const blob = await res.blob();
-          zip.file(file.relativePath, blob);
+          
+          // Ruta relativa dentro del ZIP (quitando el prefijo de la carpeta principal)
+          const relativePath = file.path.split("/").slice(1).join("/");
+          zip.file(relativePath, blob);
         })
       );
     }
@@ -392,7 +369,7 @@ async function downloadFolder(event, directory) {
     const url = URL.createObjectURL(zipBlob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `${directory.name}.zip`;
+    link.download = `${folderName}.zip`;
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -408,17 +385,15 @@ async function downloadFolder(event, directory) {
   }
 }
 
-function createCard(dir, folderData) {
+function createCard(folderName, folderData) {
   const card = document.createElement("article");
   card.className = "directory";
-
-  const directoryObj = { name: dir.name };
 
   card.innerHTML = `
     <div class="folder">
       <div class="folder-icon">📦</div>
       <div class="folder-info">
-        <div class="folder-name">${escapeHTML(dir.name)}</div>
+        <div class="folder-name">${escapeHTML(folderName)}</div>
       </div>
     </div>
 
@@ -435,7 +410,7 @@ function createCard(dir, folderData) {
 
       <div class="info-box">
         <div class="label">Archivos</div>
-        <div class="value">${folderData.files.length}</div>
+        <div class="value">${folderData.filesCount}</div>
       </div>
 
       <div class="info-box">
@@ -445,12 +420,12 @@ function createCard(dir, folderData) {
     </div>
 
     <button class="download" type="button">
-      ↓ Descargar ${escapeHTML(dir.name)}
+      ↓ Descargar ${escapeHTML(folderName)}
     </button>
   `;
 
   card.querySelector(".download").addEventListener("click", event => {
-    downloadFolder(event, directoryObj);
+    downloadFolder(event, folderName);
   });
 
   return card;
@@ -458,13 +433,25 @@ function createCard(dir, folderData) {
 
 async function init() {
   try {
-    const rootUrl = `https://api.github.com/repos/${owner}/${repo}/contents/`;
-    const response = await fetch(rootUrl);
-    if (!response.ok) throw new Error("No se pudo conectar con el repositorio.");
+    // Usar la API de Trees con recursive=1 para traer todo el repositorio en una sola petición
+    const treeUrl = `https://api.github.com/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`;
+    const response = await fetch(treeUrl);
+    if (!response.ok) throw new Error("No se pudo conectar con el repositorio. Verifica que sea público y exista la rama main.");
     
-    const items = await response.json();
-    const folders = items.filter(item => item.type === "dir" && /^v\d+/i.test(item.name));
-    folders.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+    const data = await response.json();
+    repositoryData = data.tree; // Almacenamos el árbol completo en memoria
+
+    // Detectar carpetas de primer nivel que empiecen por v o V (V1, V2...)
+    const folderSet = new Set();
+    repositoryData.forEach(item => {
+      const parts = item.path.split("/");
+      if (parts.length > 1 && /^v\d+/i.test(parts[0])) {
+        folderSet.add(parts[0]);
+      }
+    });
+
+    const folders = Array.from(folderSet);
+    folders.sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 
     if (!folders.length) {
       container.innerHTML = `
@@ -480,9 +467,16 @@ async function init() {
     statusText.textContent = `${folders.length} carpetas detectadas`;
     container.innerHTML = "";
 
-    for (const folder of folders) {
-      const folderData = await getFolderContents(folder.name);
-      container.appendChild(createCard(folder, folderData));
+    for (const folderName of folders) {
+      const folderFiles = repositoryData.filter(item => item.path.startsWith(folderName + "/") && item.type === "blob");
+      let totalSize = folderFiles.reduce((acc, file) => acc + (file.size || 0), 0);
+
+      const folderData = {
+        filesCount: folderFiles.length,
+        size: totalSize
+      };
+
+      container.appendChild(createCard(folderName, folderData));
     }
 
   } catch (error) {
