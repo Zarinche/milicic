@@ -2,32 +2,42 @@
   "directories": [
     {
       "name": "V1",
-      "size": 1548576,
-      "fileCount": 2,
       "version": "1.0.0",
+      "size": 1548576,
       "files": [
         {
-          "path": "programas/programa-uno/archivo1.exe",
           "relativePath": "archivo1.exe",
-          "url": "https://tusitio.com/programas/programa-uno/archivo1.exe"
+          "url": "programas/programa-uno/archivo1.exe"
         },
         {
-          "path": "programas/programa-uno/config.json",
           "relativePath": "config.json",
-          "url": "https://tusitio.com/programas/programa-uno/config.json"
+          "url": "programas/programa-uno/config.json"
         }
       ]
     },
     {
       "name": "V2",
-      "size": 4194304,
-      "fileCount": 1,
       "version": "2.0.0",
+      "size": 4194304,
       "files": [
         {
-          "path": "programas/programa-dos/app.exe",
           "relativePath": "app.exe",
-          "url": "https://tusitio.com/programas/programa-dos/app.exe"
+          "url": "programas/programa-dos/app.exe"
+        }
+      ]
+    },
+    {
+      "name": "V3",
+      "version": "3.0.0",
+      "size": 8388608,
+      "files": [
+        {
+          "relativePath": "setup.exe",
+          "url": "programas/programa-tres/setup.exe"
+        },
+        {
+          "relativePath": "README.txt",
+          "url": "programas/programa-tres/README.txt"
         }
       ]
     }

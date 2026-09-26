@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Automatizador</title>
+  <title>Automatizador de Programas</title>
   <style>
     :root {
       --bg: #0b0b12;
@@ -15,7 +15,7 @@
       --muted: #a6a6b8;
       --purple: #bd93f9;
       --purple-dark: #9b6de0;
-      --pink: #ff79c6;
+      --pink: #ff79c6; 
       --cyan: #8be9fd;
       --green: #50fa7b;
       --red: #ff5555;
@@ -156,13 +156,6 @@
       word-break: break-word;
     }
 
-    .folder-path {
-      margin-top: 4px;
-      color: var(--muted);
-      font-size: 0.75rem;
-      word-break: break-all;
-    }
-
     .info {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -274,20 +267,20 @@
     <div class="logo">📁</div>
     <h1>Automatizador de programas</h1>
     <p class="subtitle">
-      Explora y descarga las versiones que más te agraden.<br>
+      Explora y descarga las versiones disponibles.<br>
       SOLO DISPONIBLE PARA PC
     </p>
     <div class="status" id="statusContainer">
       <span class="status-dot"></span>
-      <span id="status">Cargando repositorio...</span>
+      <span id="status">Cargando catálogo...</span>
     </div>
   </header>
 
   <section id="directories" class="directories">
     <div class="loading">
       <div class="spinner"></div>
-      <div class="loading-title">Detectando directorios...</div>
-      <div>Cargando catálogo</div>
+      <div class="loading-title">Detectando versiones...</div>
+      <div>Preparando entorno</div>
     </div>
   </section>
 
@@ -334,7 +327,7 @@ async function downloadFolder(event, directory) {
 
   try {
     if (!directory.files || !directory.files.length) {
-      throw new Error("La carpeta está vacía.");
+      throw new Error("La versión seleccionada está vacía.");
     }
 
     const zip = new JSZip();
@@ -349,7 +342,7 @@ async function downloadFolder(event, directory) {
         batch.map(async file => {
           const response = await fetch(file.url);
           if (!response.ok) {
-            throw new Error(`No se pudo descargar: ${file.path}`);
+            throw new Error(`No se pudo descargar el archivo interno.`);
           }
           const blob = await response.blob();
           zip.file(file.relativePath, blob);
@@ -373,7 +366,7 @@ async function downloadFolder(event, directory) {
     const url = URL.createObjectURL(zipBlob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `${directory.name}.zip`;
+    link.download = `${directory.name.replaceAll(" ", "_")}.zip`;
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -382,7 +375,7 @@ async function downloadFolder(event, directory) {
 
   } catch (error) {
     console.error(error);
-    alert("No se pudo descargar la carpeta:\n\n" + error.message);
+    alert("No se pudo completar la descarga:\n\n" + error.message);
   } finally {
     button.disabled = false;
     button.textContent = originalText;
@@ -393,11 +386,14 @@ function createCard(directory) {
   const card = document.createElement("article");
   card.className = "directory";
 
+  // Conteo de archivos dinámico y real basado en el array de archivos
+  const realFileCount = directory.files ? directory.files.length : 0;
+
   card.innerHTML = `
     <div class="folder">
-      <div class="folder-icon">📁</div>
+      <div class="folder-icon">📦</div>
       <div class="folder-info">
-        <div class="folder-name">${escapeHTML(directory.name || "Sin nombre")}</div>
+        <div class="folder-name">${escapeHTML(directory.name || "Versión")}</div>
       </div>
     </div>
 
@@ -414,7 +410,7 @@ function createCard(directory) {
 
       <div class="info-box">
         <div class="label">Archivos</div>
-        <div class="value">${directory.fileCount || 0}</div>
+        <div class="value">${realFileCount}</div>
       </div>
 
       <div class="info-box">
@@ -424,7 +420,7 @@ function createCard(directory) {
     </div>
 
     <button class="download" type="button">
-      ↓ Descargar carpeta
+      ↓ Descargar ${escapeHTML(directory.name)}
     </button>
   `;
 
@@ -437,14 +433,14 @@ function createCard(directory) {
 }
 
 function showError(error) {
-  statusText.textContent = "Error";
+  statusText.textContent = "Error de carga";
   statusContainer.classList.add("error");
 
   container.innerHTML = `
     <div class="error">
       <h2>No se pudo cargar el catálogo</h2>
       <p>${escapeHTML(error.message)}</p>
-      <p style="margin-top:15px">Comprueba que manifest.json exista en la raíz del sitio.</p>
+      <p style="margin-top:15px">Verifica que el archivo manifest.json esté configurado correctamente.</p>
     </div>
   `;
 }
@@ -454,18 +450,18 @@ async function init() {
     const manifest = await loadManifest();
     const directories = manifest.directories || [];
 
-    if (!directories.length) {
+    if (!directories.length.toString()) {
       container.innerHTML = `
         <div class="empty">
-          <h2>No hay carpetas disponibles</h2>
-          <p style="margin-top:10px">El repositorio no contiene directorios publicables.</p>
+          <h2>No hay versiones disponibles</h2>
+          <p style="margin-top:10px">El repositorio no contiene paquetes configurados.</p>
         </div>
       `;
-      statusText.textContent = "0 directorios encontrados";
+      statusText.textContent = "0 versiones encontradas";
       return;
     }
 
-    statusText.textContent = `${directories.length} directorios encontrados`;
+    statusText.textContent = `${directories.length} versiones detectadas`;
     container.innerHTML = "";
 
     for (const directory of directories) {
