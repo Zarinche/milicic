@@ -295,18 +295,9 @@ const container = document.getElementById("directories");
 const statusText = document.getElementById("status");
 const statusContainer = document.getElementById("statusContainer");
 
-// Detectar automáticamente usuario y repositorio de GitHub Pages
-const hostname = window.location.hostname;
-const pathname = window.location.pathname;
-
-let owner = "zarinche"; // Tu usuario predeterminado
-let repo = "zarinche.github.io"; // Tu repositorio predeterminado
-
-if (hostname.endsWith(".github.io")) {
-  owner = hostname.split(".")[0];
-  const segments = pathname.split("/").filter(Boolean);
-  repo = segments.length > 0 ? segments[0] : `${owner}.github.io`;
-}
+// Configuración fija del repositorio real
+const owner = "Zarinche";
+const repo = "milicic";
 
 function formatBytes(bytes) {
   if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
@@ -339,7 +330,6 @@ async function getFolderContents(currentPath = "") {
       files.push({
         name: item.name,
         path: item.path,
-        // Ruta relativa manteniendo la estructura interna de la carpeta
         relativePath: item.path.split("/").slice(1).join("/"), 
         downloadUrl: item.download_url,
         size: item.size
@@ -468,17 +458,12 @@ function createCard(dir, folderData) {
 
 async function init() {
   try {
-    // Obtener la raíz del repositorio de GitHub
     const rootUrl = `https://api.github.com/repos/${owner}/${repo}/contents/`;
     const response = await fetch(rootUrl);
     if (!response.ok) throw new Error("No se pudo conectar con el repositorio.");
     
     const items = await response.json();
-    
-    // Filtrar únicamente carpetas que empiecen con V o v (V1, V2, V3...) y excluir carpetas ocultas
     const folders = items.filter(item => item.type === "dir" && /^v\d+/i.test(item.name));
-    
-    // Ordenar lógicamente (V1, V2, V3...)
     folders.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
 
     if (!folders.length) {
@@ -495,7 +480,6 @@ async function init() {
     statusText.textContent = `${folders.length} carpetas detectadas`;
     container.innerHTML = "";
 
-    // Cargar información rápida de cada carpeta para mostrar su peso y número de archivos
     for (const folder of folders) {
       const folderData = await getFolderContents(folder.name);
       container.appendChild(createCard(folder, folderData));
