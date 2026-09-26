@@ -7,11 +7,11 @@
       "files": [
         {
           "relativePath": "archivo1.exe",
-          "url": "programas/programa-uno/archivo1.exe"
+          "url": "V1/archivo1.exe"
         },
         {
           "relativePath": "config.json",
-          "url": "programas/programa-uno/config.json"
+          "url": "V1/config.json"
         }
       ]
     },
@@ -22,7 +22,7 @@
       "files": [
         {
           "relativePath": "app.exe",
-          "url": "programas/programa-dos/app.exe"
+          "url": "V2/app.exe"
         }
       ]
     },
@@ -33,11 +33,11 @@
       "files": [
         {
           "relativePath": "setup.exe",
-          "url": "programas/programa-tres/setup.exe"
+          "url": "V3/setup.exe"
         },
         {
           "relativePath": "README.txt",
-          "url": "programas/programa-tres/README.txt"
+          "url": "V3/README.txt"
         }
       ]
     }
