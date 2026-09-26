@@ -267,20 +267,20 @@
     <div class="logo">📁</div>
     <h1>Automatizador de programas</h1>
     <p class="subtitle">
-      Explora y descarga las versiones disponibles.<br>
+      Explora y descarga las carpetas de versiones.<br>
       SOLO DISPONIBLE PARA PC
     </p>
     <div class="status" id="statusContainer">
       <span class="status-dot"></span>
-      <span id="status">Cargando catálogo...</span>
+      <span id="status">Conectando con GitHub...</span>
     </div>
   </header>
 
   <section id="directories" class="directories">
     <div class="loading">
       <div class="spinner"></div>
-      <div class="loading-title">Detectando versiones...</div>
-      <div>Preparando entorno</div>
+      <div class="loading-title">Escaneando repositorio...</div>
+      <div>Buscando carpetas de versiones</div>
     </div>
   </section>
 
@@ -295,13 +295,17 @@ const container = document.getElementById("directories");
 const statusText = document.getElementById("status");
 const statusContainer = document.getElementById("statusContainer");
 
-async function loadManifest() {
-  const url = `manifest.json?v=${Date.now()}`;
-  const response = await fetch(url, { cache: "no-store" });
-  if (!response.ok) {
-    throw new Error(`No se pudo cargar manifest.json (${response.status})`);
-  }
-  return response.json();
+// Detectar automáticamente usuario y repositorio de GitHub Pages
+const hostname = window.location.hostname;
+const pathname = window.location.pathname;
+
+let owner = "zarinche"; // Tu usuario predeterminado
+let repo = "zarinche.github.io"; // Tu repositorio predeterminado
+
+if (hostname.endsWith(".github.io")) {
+  owner = hostname.split(".")[0];
+  const segments = pathname.split("/").filter(Boolean);
+  repo = segments.length > 0 ? segments[0] : `${owner}.github.io`;
 }
 
 function formatBytes(bytes) {
@@ -320,19 +324,53 @@ function escapeHTML(value) {
     .replaceAll("'", "&#039;");
 }
 
+// Escanear recursivamente el contenido de una carpeta en GitHub
+async function getFolderContents(currentPath = "") {
+  const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${currentPath}`;
+  const response = await fetch(apiUrl);
+  if (!response.ok) throw new Error(`No se pudo acceder a la ruta: ${currentPath}`);
+  
+  const items = await response.json();
+  let files = [];
+  let totalSize = 0;
+
+  for (const item of items) {
+    if (item.type === "file") {
+      files.push({
+        name: item.name,
+        path: item.path,
+        // Ruta relativa manteniendo la estructura interna de la carpeta
+        relativePath: item.path.split("/").slice(1).join("/"), 
+        downloadUrl: item.download_url,
+        size: item.size
+      });
+      totalSize += item.size;
+    } else if (item.type === "dir") {
+      const subFolder = await getFolderContents(item.path);
+      files = files.concat(subFolder.files);
+      totalSize += subFolder.size;
+    }
+  }
+
+  return { files, size: totalSize };
+}
+
 async function downloadFolder(event, directory) {
   const button = event.currentTarget;
   const originalText = button.textContent;
   button.disabled = true;
 
   try {
-    if (!directory.files || !directory.files.length) {
-      throw new Error("La versión seleccionada está vacía.");
+    button.textContent = "Obteniendo archivos...";
+    const folderData = await getFolderContents(directory.name);
+
+    if (!folderData.files.length) {
+      throw new Error("La carpeta está vacía.");
     }
 
     const zip = new JSZip();
-    const files = directory.files;
-    const concurrency = 6;
+    const files = folderData.files;
+    const concurrency = 5;
 
     for (let i = 0; i < files.length; i += concurrency) {
       const batch = files.slice(i, i + concurrency);
@@ -340,17 +378,15 @@ async function downloadFolder(event, directory) {
 
       await Promise.all(
         batch.map(async file => {
-          const response = await fetch(file.url);
-          if (!response.ok) {
-            throw new Error(`No se pudo descargar el archivo interno.`);
-          }
-          const blob = await response.blob();
+          const res = await fetch(file.downloadUrl);
+          if (!res.ok) throw new Error(`Error al descargar ${file.name}`);
+          const blob = await res.blob();
           zip.file(file.relativePath, blob);
         })
       );
     }
 
-    button.textContent = "Comprimiendo...";
+    button.textContent = "Comprimiendo ZIP...";
 
     const zipBlob = await zip.generateAsync(
       {
@@ -366,7 +402,7 @@ async function downloadFolder(event, directory) {
     const url = URL.createObjectURL(zipBlob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `${directory.name.replaceAll(" ", "_")}.zip`;
+    link.download = `${directory.name}.zip`;
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -382,18 +418,17 @@ async function downloadFolder(event, directory) {
   }
 }
 
-function createCard(directory) {
+function createCard(dir, folderData) {
   const card = document.createElement("article");
   card.className = "directory";
 
-  // Conteo de archivos dinámico y real basado en el array de archivos
-  const realFileCount = directory.files ? directory.files.length : 0;
+  const directoryObj = { name: dir.name };
 
   card.innerHTML = `
     <div class="folder">
       <div class="folder-icon">📦</div>
       <div class="folder-info">
-        <div class="folder-name">${escapeHTML(directory.name || "Versión")}</div>
+        <div class="folder-name">${escapeHTML(dir.name)}</div>
       </div>
     </div>
 
@@ -405,72 +440,78 @@ function createCard(directory) {
 
       <div class="info-box">
         <div class="label">Peso</div>
-        <div class="value">${formatBytes(directory.size)}</div>
+        <div class="value">${formatBytes(folderData.size)}</div>
       </div>
 
       <div class="info-box">
         <div class="label">Archivos</div>
-        <div class="value">${realFileCount}</div>
+        <div class="value">${folderData.files.length}</div>
       </div>
 
       <div class="info-box">
-        <div class="label">Versión</div>
-        <div class="value">${escapeHTML(directory.version || "1.0")}</div>
+        <div class="label">Tipo</div>
+        <div class="value">Carpeta ZIP</div>
       </div>
     </div>
 
     <button class="download" type="button">
-      ↓ Descargar ${escapeHTML(directory.name)}
+      ↓ Descargar ${escapeHTML(dir.name)}
     </button>
   `;
 
-  const button = card.querySelector(".download");
-  button.addEventListener("click", event => {
-    downloadFolder(event, directory);
+  card.querySelector(".download").addEventListener("click", event => {
+    downloadFolder(event, directoryObj);
   });
 
   return card;
 }
 
-function showError(error) {
-  statusText.textContent = "Error de carga";
-  statusContainer.classList.add("error");
-
-  container.innerHTML = `
-    <div class="error">
-      <h2>No se pudo cargar el catálogo</h2>
-      <p>${escapeHTML(error.message)}</p>
-      <p style="margin-top:15px">Verifica que el archivo manifest.json esté configurado correctamente.</p>
-    </div>
-  `;
-}
-
 async function init() {
   try {
-    const manifest = await loadManifest();
-    const directories = manifest.directories || [];
+    // Obtener la raíz del repositorio de GitHub
+    const rootUrl = `https://api.github.com/repos/${owner}/${repo}/contents/`;
+    const response = await fetch(rootUrl);
+    if (!response.ok) throw new Error("No se pudo conectar con el repositorio.");
+    
+    const items = await response.json();
+    
+    // Filtrar únicamente carpetas que empiecen con V o v (V1, V2, V3...) y excluir carpetas ocultas
+    const folders = items.filter(item => item.type === "dir" && /^v\d+/i.test(item.name));
+    
+    // Ordenar lógicamente (V1, V2, V3...)
+    folders.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
 
-    if (!directories.length.toString()) {
+    if (!folders.length) {
       container.innerHTML = `
         <div class="empty">
-          <h2>No hay versiones disponibles</h2>
-          <p style="margin-top:10px">El repositorio no contiene paquetes configurados.</p>
+          <h2>No se encontraron carpetas V1, V2...</h2>
+          <p style="margin-top:10px">Asegúrate de subir tus carpetas de versiones a la raíz de tu repositorio.</p>
         </div>
       `;
-      statusText.textContent = "0 versiones encontradas";
+      statusText.textContent = "0 carpetas detectadas";
       return;
     }
 
-    statusText.textContent = `${directories.length} versiones detectadas`;
+    statusText.textContent = `${folders.length} carpetas detectadas`;
     container.innerHTML = "";
 
-    for (const directory of directories) {
-      container.appendChild(createCard(directory));
+    // Cargar información rápida de cada carpeta para mostrar su peso y número de archivos
+    for (const folder of folders) {
+      const folderData = await getFolderContents(folder.name);
+      container.appendChild(createCard(folder, folderData));
     }
 
   } catch (error) {
     console.error(error);
-    showError(error);
+    statusText.textContent = "Error de conexión";
+    statusContainer.classList.add("error");
+    container.innerHTML = `
+      <div class="error">
+        <h2>No se pudo escanear el repositorio</h2>
+        <p>${escapeHTML(error.message)}</p>
+        <p style="margin-top:15px">Verifica que tu repositorio de GitHub sea público.</p>
+      </div>
+    `;
   }
 }
 
